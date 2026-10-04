@@ -30,7 +30,9 @@ public sealed class TsukimichiLink : IDisposable
     private readonly ICallGateSubscriber<(string, int)[]> getEndingSoon;
     private readonly ICallGateSubscriber<(string, int, bool)> getStoryMeter;
     private readonly ICallGateSubscriber<string> getTheme;
+    private readonly ICallGateSubscriber<int, (uint, string, string)[]> getReadyTonight;
     private readonly ICallGateSubscriber<string, bool> openAt;
+    private readonly ICallGateSubscriber<uint, bool> openQuest;
     private readonly ICallGateSubscriber<string, string, int> addonHello;
     private readonly ICallGateSubscriber<object> summaryChanged;
     private readonly ICallGateSubscriber<object> disposing;
@@ -53,7 +55,9 @@ public sealed class TsukimichiLink : IDisposable
         getEndingSoon = plugin.GetIpcSubscriber<(string, int)[]>("Tsukimichi.GetEndingSoon");
         getStoryMeter = plugin.GetIpcSubscriber<(string, int, bool)>("Tsukimichi.GetStoryMeter");
         getTheme = plugin.GetIpcSubscriber<string>("Tsukimichi.GetTheme");
+        getReadyTonight = plugin.GetIpcSubscriber<int, (uint, string, string)[]>("Tsukimichi.GetReadyTonight");
         openAt = plugin.GetIpcSubscriber<string, bool>("Tsukimichi.OpenAt");
+        openQuest = plugin.GetIpcSubscriber<uint, bool>("Tsukimichi.OpenQuest");
         addonHello = plugin.GetIpcSubscriber<string, string, int>("Tsukimichi.AddonHello");
         summaryChanged = plugin.GetIpcSubscriber<object>("Tsukimichi.SummaryChanged");
         disposing = plugin.GetIpcSubscriber<object>("Tsukimichi.Disposing");
@@ -74,6 +78,18 @@ public sealed class TsukimichiLink : IDisposable
 
     /// <summary>Opens Tsukimichi at a place (<see cref="Places"/>); never travels. Call it from a click.</summary>
     public bool OpenAt(string place) => Try(() => openAt.InvokeFunc(place), false);
+
+    /// <summary>
+    /// Opens Tsukimichi at the first place this build knows: <paramref name="place"/>, else <paramref name="fallback"/>
+    /// (OpenAt answers false for a place an older Tsukimichi doesn't know). Call it from a click.
+    /// </summary>
+    public bool OpenAt(string place, string fallback) => OpenAt(place) || OpenAt(fallback);
+
+    /// <summary>
+    /// Opens a quest in Tsukimichi's window (<c>Tsukimichi.OpenQuest</c>, spec-1.22 A1: "A Ready row opens that quest");
+    /// Tonight when that fails. It never travels. Call it from a click.
+    /// </summary>
+    public bool OpenQuest(uint rowId) => Try(() => openQuest.InvokeFunc(rowId), false) || OpenAt(Places.Tonight);
 
     /// <summary>
     /// Opens Dalamud's plugin installer where Tsukimichi is: its installed list when Tsukimichi is installed (to turn it
@@ -139,6 +155,10 @@ public sealed class TsukimichiLink : IDisposable
         var ending = Try(() => getEndingSoon.InvokeFunc(), []);
         var story = Try(() => getStoryMeter.InvokeFunc(), (string.Empty, 0, false));
 
+        // Null when this Tsukimichi lacks the gate (IpcNotReadyError): the popup then shows the count row instead.
+        var readyTonight = ReadyQuest.From(Try<(uint, string, string)[]?>(
+            () => getReadyTonight.InvokeFunc(SummaryText.ReadyQuestsShown), null));
+
         var events = new EndingEvent[ending.Length];
         for (var i = 0; i < ending.Length; i++)
         {
@@ -161,7 +181,8 @@ public sealed class TsukimichiLink : IDisposable
             story.Item1 ?? string.Empty,
             story.Item2,
             story.Item3,
-            theme ?? string.Empty);
+            theme ?? string.Empty,
+            readyTonight);
     }
 
     private void Publish(Summary summary)

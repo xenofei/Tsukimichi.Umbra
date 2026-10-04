@@ -21,7 +21,8 @@ public sealed record Summary(
     string StoryPart,
     int StoryLeft,
     bool CaughtUp,
-    string Theme)
+    string Theme,
+    IReadOnlyList<ReadyQuest>? ReadyTonight = null)
 {
     /// <summary>The summary of a state with no data (Tsukimichi absent, too old, too new or not ready).</summary>
     public static Summary Empty(LinkState state) =>
@@ -32,6 +33,37 @@ public sealed record Summary(
 
     /// <summary>Whether the journal was read (<c>GetJournalRoom</c> answers (-1, 0) when not).</summary>
     public bool HasJournal => JournalUsed >= 0 && JournalCap > 0;
+}
+
+/// <summary>
+/// A Ready quest from <c>Tsukimichi.GetReadyTonight</c>: its Quest row id, its name and its giver's zone, both through
+/// the character's spoiler shield on Tsukimichi's side. <see cref="Summary.ReadyTonight"/> is null when the installed
+/// Tsukimichi lacks that gate.
+/// </summary>
+public readonly record struct ReadyQuest(uint RowId, string Name, string Place)
+{
+    /// <summary>
+    /// The gate's answer as the popup keeps it: null stays null (the gate is missing, so the popup shows the count row),
+    /// null strings become empty, and rows with no id or no name are dropped.
+    /// </summary>
+    public static IReadOnlyList<ReadyQuest>? From((uint RowId, string Name, string Place)[]? answer)
+    {
+        if (answer is null)
+        {
+            return null;
+        }
+
+        var list = new List<ReadyQuest>(answer.Length);
+        foreach (var (rowId, name, place) in answer)
+        {
+            if (rowId != 0 && !string.IsNullOrEmpty(name))
+            {
+                list.Add(new ReadyQuest(rowId, name, place ?? string.Empty));
+            }
+        }
+
+        return list;
+    }
 }
 
 /// <summary>A seasonal event ending soon: its name and whole days left (0 ends today).</summary>

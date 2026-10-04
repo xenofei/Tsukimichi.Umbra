@@ -8,6 +8,12 @@ namespace Tsukimichi.Umbra.Core;
 /// <param name="OffersInstaller">Whether "Open the plugin installer" helps.</param>
 public readonly record struct MissingReason(string Title, string Line, bool OffersInstaller);
 
+/// <summary>The Ready group's rows.</summary>
+/// <param name="Quests">The named quests, at most <see cref="SummaryText.ReadyQuestsShown"/>; each opens that quest.</param>
+/// <param name="More">"9 more", which opens Tonight; empty when every Ready quest is named.</param>
+/// <param name="CountRow">The fallback row when no quest is named; empty when quests are named.</param>
+public readonly record struct ReadyPlan(IReadOnlyList<ReadyQuest> Quests, string More, string CountRow);
+
 /// <summary>
 /// Every word the widgets and the popup show (spec-1.22 A1–A3, umbra-widgets-1.22.png). English only, as Tsukimichi.
 /// Pure: the widgets call these only when the summary or the minute changes, never per frame.
@@ -71,9 +77,43 @@ public static class SummaryText
     /// <summary>The Ready group's label: "Ready tonight · 12".</summary>
     public static string ReadyGroup(int ready) => string.Create(Invariant, $"Ready tonight · {Math.Max(0, ready)}");
 
+    /// <summary>How many Ready quests the popup names before "N more" (spec-1.22 A1).</summary>
+    public const int ReadyQuestsShown = 3;
+
     /// <summary>
-    /// The Ready group's row: "See them in Tonight", or "Nothing Ready on WHM tonight". The summary gives the count, not
-    /// the quests, so the row opens Tonight, where they are listed.
+    /// What the Ready group shows (spec-1.22 A1): the first three Ready quests by name with their place, then "9 more".
+    /// When the installed Tsukimichi lacks <c>GetReadyTonight</c> (or it answered nothing while the count says some are
+    /// Ready), the group falls back to one count row, <see cref="ReadyRow"/>.
+    /// </summary>
+    public static ReadyPlan PlanReady(Summary summary)
+    {
+        if (!summary.IsReady)
+        {
+            return new ReadyPlan([], string.Empty, string.Empty);
+        }
+
+        var list = summary.ReadyTonight;
+        if (list is null || (list.Count == 0 && summary.ReadyCount > 0))
+        {
+            return new ReadyPlan([], string.Empty, ReadyRow(summary.ReadyCount, summary.Job));
+        }
+
+        if (list.Count == 0)
+        {
+            return new ReadyPlan([], string.Empty, ReadyRow(0, summary.Job));
+        }
+
+        IReadOnlyList<ReadyQuest> shown = list.Count <= ReadyQuestsShown ? list : list.Take(ReadyQuestsShown).ToArray();
+        var more = summary.ReadyCount - shown.Count;
+        return new ReadyPlan(shown, more > 0 ? MoreReady(more) : string.Empty, string.Empty);
+    }
+
+    /// <summary>The row after the named Ready quests: "9 more".</summary>
+    public static string MoreReady(int more) => string.Create(Invariant, $"{more} more");
+
+    /// <summary>
+    /// The Ready group's count row, when the quests can't be named: "See them in Tonight", or "Nothing Ready on WHM
+    /// tonight". It opens Tonight, where they are listed.
     /// </summary>
     public static string ReadyRow(int ready, string job)
     {

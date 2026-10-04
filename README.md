@@ -14,7 +14,7 @@ It is a separate add-on: an Umbra custom plugin, not a Dalamud plugin. **It need
 | **Tsukimichi: Story meter** | the expansion over "91 to the latest story" | your choice |
 | **Tsukimichi: Next reset** | "Next reset" over "daily in 3 h 12 m" | your choice |
 
-**The popup** has Up next with **Go**, tonight's Ready count, your journal's room, the events ending soon, and Open Tsukimichi, Route and Settings.
+**The popup** has Up next with **Go**, tonight's first three Ready quests with their place (then "9 more"), your journal's room with **Make room**, the events ending soon, and Open Tsukimichi, Route and Settings. A Ready quest opens in Tsukimichi when clicked.
 
 - **Go opens Tsukimichi on Up next. It never starts travel or a run.** Anything that moves your character still needs your click inside Tsukimichi.
 - Quest names come from Tsukimichi with its spoiler shield already applied, so the add-on never shows a name Tsukimichi hides.

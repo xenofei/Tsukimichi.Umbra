@@ -43,8 +43,8 @@ internal static class QuestMarkers
     /// <summary>The side quest marker, for a quest the sheet doesn't know.</summary>
     public const uint SidequestMarker = 71221;
 
-    private static uint lastRowId;
-    private static uint lastIcon = SidequestMarker;
+    // Up next and the Ready rows ask for a handful of quests an evening; a marker never changes, so keep each one.
+    private static readonly Dictionary<uint, uint> Cache = [];
 
     public static uint For(uint questRowId)
     {
@@ -53,9 +53,9 @@ internal static class QuestMarkers
             return SidequestMarker;
         }
 
-        if (questRowId == lastRowId)
+        if (Cache.TryGetValue(questRowId, out var cached))
         {
-            return lastIcon;
+            return cached;
         }
 
         var icon = SidequestMarker;
@@ -73,8 +73,7 @@ internal static class QuestMarkers
             // No data manager or no sheet: keep the side quest marker.
         }
 
-        lastRowId = questRowId;
-        lastIcon = icon;
+        Cache[questRowId] = icon;
         return icon;
     }
 }

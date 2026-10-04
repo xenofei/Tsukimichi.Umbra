@@ -28,9 +28,12 @@ internal sealed class TsukimichiMenu
     private readonly MenuPopup.Button upNext = new(string.Empty);
     private readonly MenuPopup.Button upNextStep = Statement(null);
     private readonly MenuPopup.Group readyGroup = new(SummaryText.ReadyGroup(0));
+    private readonly MenuPopup.Button[] readyQuestRows = new MenuPopup.Button[SummaryText.ReadyQuestsShown];
+    private readonly uint[] readyQuestIds = new uint[SummaryText.ReadyQuestsShown];
+    private readonly MenuPopup.Button readyMore = new(string.Empty);
     private readonly MenuPopup.Button readyRow = new(string.Empty) { Icon = QuestMarkers.SidequestMarker };
     private readonly MenuPopup.Group journalGroup = new("Journal");
-    private readonly MenuPopup.Button journalRow = new(string.Empty) { Icon = FontAwesomeIcon.Book };
+    private readonly MenuPopup.Button journalRow = new(string.Empty) { Icon = FontAwesomeIcon.Book, AltText = "Make room" };
     private readonly MenuPopup.Group endingGroup = new("Ending soon");
     private readonly MenuPopup.Button[] endingRows = new MenuPopup.Button[EndingRows];
 
@@ -53,8 +56,9 @@ internal sealed class TsukimichiMenu
 
         // Go opens Tsukimichi on Up next with its travel pill focused; it never starts travel or a run by itself.
         upNext.OnClick = () => link.OpenAt(hasUpNext ? Places.UpNext : Places.Tonight);
+        readyMore.OnClick = () => link.OpenAt(Places.Tonight);
         readyRow.OnClick = () => link.OpenAt(Places.Tonight);
-        journalRow.OnClick = () => link.OpenAt(Places.Main);
+        journalRow.OnClick = () => link.OpenAt(Places.MakeRoom, Places.Main);
         openMain.OnClick = () => link.OpenAt(Places.Main);
         openRoute.OnClick = () => link.OpenAt(Places.Route);
         openSettings.OnClick = () => link.OpenAt(Places.Settings);
@@ -64,6 +68,17 @@ internal sealed class TsukimichiMenu
         missingGroup.Add(missingLine);
         upNextGroup.Add(upNext);
         upNextGroup.Add(upNextStep);
+        for (var i = 0; i < readyQuestRows.Length; i++)
+        {
+            var index = i;
+
+            // A Ready row opens that quest in Tsukimichi (spec-1.22 A1); never travel.
+            var row = new MenuPopup.Button(string.Empty) { OnClick = () => link.OpenQuest(readyQuestIds[index]) };
+            readyQuestRows[i] = row;
+            readyGroup.Add(row);
+        }
+
+        readyGroup.Add(readyMore);
         readyGroup.Add(readyRow);
         journalGroup.Add(journalRow);
 
@@ -113,9 +128,26 @@ internal sealed class TsukimichiMenu
         upNextStep.IsVisible = hasUpNext && summary.UpNextStep.Length > 0;
         upNextStep.Label = summary.UpNextStep;
 
+        var plan = SummaryText.PlanReady(summary);
         readyGroup.Label = SummaryText.ReadyGroup(summary.ReadyCount);
-        readyRow.IsVisible = ready;
-        readyRow.Label = SummaryText.ReadyRow(summary.ReadyCount, summary.Job);
+        for (var i = 0; i < readyQuestRows.Length; i++)
+        {
+            var row = readyQuestRows[i];
+            var shown = i < plan.Quests.Count;
+            var quest = shown ? plan.Quests[i] : default;
+            readyQuestIds[i] = quest.RowId;
+            row.IsVisible = shown;
+            row.Label = quest.Name ?? string.Empty;
+            row.AltText = quest.Place ?? string.Empty;
+            row.Icon = shown ? QuestMarkers.For(quest.RowId) : null;
+        }
+
+        readyMore.IsVisible = plan.More.Length > 0;
+        readyMore.Label = plan.More;
+
+        // The count row: Tsukimichi without GetReadyTonight, or nothing Ready.
+        readyRow.IsVisible = plan.CountRow.Length > 0;
+        readyRow.Label = plan.CountRow;
         readyRow.AltText = SummaryText.HereCount(summary.HereCount);
 
         journalRow.IsVisible = ready && summary.HasJournal;

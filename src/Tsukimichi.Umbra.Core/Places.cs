@@ -11,6 +11,9 @@ public static class Places
     public const string UpNext = "upnext";
     public const string Route = "route";
     public const string Settings = "settings";
+
+    /// <summary>The main window with Make room open (since Tsukimichi 1.22.0; an older build answers false).</summary>
+    public const string MakeRoom = "makeroom";
 }
 
 /// <summary>What clicking a small widget does (spec-1.22 A2: open Tsukimichi, Tonight, the popup, or nothing).</summary>
