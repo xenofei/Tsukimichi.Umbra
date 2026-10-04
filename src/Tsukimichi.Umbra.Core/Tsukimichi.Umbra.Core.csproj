@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The add-on's pure parts (the version check, every word the widgets show, the reset clock), with no Umbra or Dalamud
+    reference so the tests run anywhere. The add-on compiles these same files into its own DLL (see
+    ../Tsukimichi.Umbra/Tsukimichi.Umbra.csproj), so Umbra loads one file.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Tsukimichi.Umbra.Core</RootNamespace>
+  </PropertyGroup>
+
+</Project>

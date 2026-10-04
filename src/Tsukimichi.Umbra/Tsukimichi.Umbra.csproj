@@ -1,0 +1,89 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Tsukimichi for Umbra: an Umbra custom plugin (a plain .NET DLL that Umbra loads into its own load context), as
+    una-xiv/Umbra.SamplePlugin builds one. Umbra forwards the Umbra, Umbra.Common, Umbra.Game, Una.Drawing, Dalamud,
+    Lumina, Lumina.Excel, Dalamud.Bindings.ImGui and FFXIVClientStructs references to its own copies, so none of them is
+    copied to the output.
+
+    References come from, in order:
+      UMBRA_HOME / DALAMUD_HOME (environment), as the release workflow sets them from umbra-dist and dalamud-distrib;
+      else the installed Umbra (%AppData%\XIVLauncher\installedPlugins\Umbra\<version>\) and Dalamud
+      (%AppData%\XIVLauncher\addon\Hooks\dev\).
+  -->
+  <PropertyGroup>
+    <DalamudLibPath Condition="'$(DALAMUD_HOME)' != ''">$([MSBuild]::EnsureTrailingSlash('$(DALAMUD_HOME)'))</DalamudLibPath>
+    <DalamudLibPath Condition="'$(DalamudLibPath)' == ''">$(APPDATA)\XIVLauncher\addon\Hooks\dev\</DalamudLibPath>
+    <UmbraLibPath Condition="'$(UMBRA_HOME)' != ''">$([MSBuild]::EnsureTrailingSlash('$(UMBRA_HOME)'))</UmbraLibPath>
+    <UmbraInstallRoot>$(APPDATA)\XIVLauncher\installedPlugins\Umbra\</UmbraInstallRoot>
+    <UmbraLibPath Condition="'$(UmbraLibPath)' == '' And Exists('$(UmbraInstallRoot)')">$([System.IO.Directory]::GetDirectories('$(UmbraInstallRoot)')[0])\</UmbraLibPath>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <RootNamespace>Tsukimichi.Umbra</RootNamespace>
+    <AssemblyName>Tsukimichi.Umbra</AssemblyName>
+    <Version>1.0.0</Version>
+    <Product>Tsukimichi for Umbra</Product>
+    <Description>Umbra toolbar widgets that show Tsukimichi's summary: tonight's Ready count, Up next, the journal, the story meter and the next reset.</Description>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <DebugType>portable</DebugType>
+  </PropertyGroup>
+
+  <Target Name="CheckReferencePaths" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="!Exists('$(UmbraLibPath)Umbra.dll')" Text="Umbra.dll not found (UmbraLibPath='$(UmbraLibPath)'). Install Umbra through XIVLauncher, or set UMBRA_HOME to an unpacked una-xiv/umbra-dist latest.zip." />
+    <Error Condition="!Exists('$(DalamudLibPath)Dalamud.dll')" Text="Dalamud.dll not found (DalamudLibPath='$(DalamudLibPath)'). Set DALAMUD_HOME to an unpacked goatcorp dalamud-distrib latest.zip." />
+  </Target>
+
+  <ItemGroup>
+    <!-- The pure parts, compiled in so Umbra loads a single DLL (an extra DLL in the release would be offered as a plugin). -->
+    <Compile Include="..\Tsukimichi.Umbra.Core\**\*.cs" Exclude="..\Tsukimichi.Umbra.Core\obj\**;..\Tsukimichi.Umbra.Core\bin\**" LinkBase="Core" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\assets\moons\*.png" LogicalName="Tsukimichi.Umbra.Moons.%(Filename).png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Umbra">
+      <HintPath>$(UmbraLibPath)Umbra.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Umbra.Common">
+      <HintPath>$(UmbraLibPath)Umbra.Common.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Umbra.Game">
+      <HintPath>$(UmbraLibPath)Umbra.Game.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Una.Drawing">
+      <HintPath>$(UmbraLibPath)Una.Drawing.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Dalamud">
+      <HintPath>$(DalamudLibPath)Dalamud.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Dalamud.Bindings.ImGui">
+      <HintPath>$(DalamudLibPath)Dalamud.Bindings.ImGui.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="FFXIVClientStructs">
+      <HintPath>$(DalamudLibPath)FFXIVClientStructs.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Lumina">
+      <HintPath>$(DalamudLibPath)Lumina.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Lumina.Excel">
+      <HintPath>$(DalamudLibPath)Lumina.Excel.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

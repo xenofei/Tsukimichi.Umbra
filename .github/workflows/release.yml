@@ -1,0 +1,97 @@
+name: Release
+
+# Push a tag like v1.0.0 to build Tsukimichi for Umbra and publish it as this repository's latest GitHub release,
+# which is where Umbra looks (api.github.com/repos/xenofei/Tsukimichi.Umbra/releases/latest; it downloads the .zip and
+# loads the DLL in it). Umbra treats a release whose name differs from the installed one as an update, so the release
+# is named after the version ("1.0.0").
+#
+# The build references Umbra (una-xiv/umbra-dist, latest) and Dalamud (goatcorp dalamud-distrib, latest). Neither is
+# shipped: Umbra forwards them to its own copies at load time.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the tagged commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Guard - the tag equals the csproj Version
+        shell: pwsh
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          if ($env:TAG -notmatch '^v(\d+\.\d+\.\d+)$') {
+            Write-Host "::error::Tag '$env:TAG' is not of the form vX.Y.Z."
+            exit 1
+          }
+          $version = $Matches[1]
+          $csproj = [xml](Get-Content src/Tsukimichi.Umbra/Tsukimichi.Umbra.csproj -Raw)
+          $declared = ($csproj.Project.PropertyGroup | ForEach-Object { $_.Version } | Where-Object { $_ } | Select-Object -First 1).Trim()
+          if ($declared -ne $version) {
+            Write-Host "::error::Tag $env:TAG names $version but Tsukimichi.Umbra.csproj has <Version>$declared</Version>."
+            exit 1
+          }
+          "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Download the build references (Dalamud, Umbra)
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/latest.zip -OutFile dalamud.zip
+          Expand-Archive dalamud.zip -DestinationPath "$env:RUNNER_TEMP\dalamud"
+          Invoke-WebRequest -Uri https://raw.githubusercontent.com/una-xiv/umbra-dist/main/dist/Umbra/latest.zip -OutFile umbra.zip
+          Expand-Archive umbra.zip -DestinationPath "$env:RUNNER_TEMP\umbra"
+          $umbra = Get-Content "$env:RUNNER_TEMP\umbra\Umbra.json" -Raw | ConvertFrom-Json
+          Write-Host "Building against Umbra $($umbra.AssemblyVersion)"
+          "UMBRA_VERSION=$($umbra.AssemblyVersion)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "DALAMUD_HOME=$env:RUNNER_TEMP\dalamud" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "UMBRA_HOME=$env:RUNNER_TEMP\umbra" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Build (warnings are errors)
+        run: dotnet build Tsukimichi.Umbra.sln -c Release -warnaserror
+
+      - name: Test
+        run: dotnet test Tsukimichi.Umbra.sln -c Release --no-build
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $out = "src/Tsukimichi.Umbra/bin/Release"
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path "$out/Tsukimichi.Umbra.dll", "$out/Tsukimichi.Umbra.pdb" -DestinationPath dist/Tsukimichi.Umbra.zip
+          (Get-FileHash dist/Tsukimichi.Umbra.zip -Algorithm SHA256).Hash.ToLowerInvariant() + "  Tsukimichi.Umbra.zip" | Out-File -Encoding ascii dist/SHA256SUMS.txt
+
+      - name: Publish the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          $notes = @"
+          Tsukimichi for Umbra $env:RELEASE_VERSION, built against Umbra $env:UMBRA_VERSION.
+
+          Needs Tsukimichi 1.22 or later and Umbra's custom plugins. In Umbra: Settings > Plugins, turn on custom plugins, add the repository ``xenofei/Tsukimichi.Umbra``, then add the Tsukimichi widgets from the widget list.
+
+          SHA-256 of Tsukimichi.Umbra.zip: $((Get-Content dist/SHA256SUMS.txt).Split(' ')[0])
+          "@
+          # Umbra downloads every asset of the latest release, so the zip is the only asset.
+          gh release create $env:TAG dist/Tsukimichi.Umbra.zip --repo $env:GITHUB_REPOSITORY --title $env:RELEASE_VERSION --notes $notes --verify-tag
