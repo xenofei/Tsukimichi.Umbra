@@ -201,6 +201,13 @@ public sealed class TsukimichiLink : IDisposable
             // Tsukimichi is not installed, not loaded, reloading, or older than the gate.
             return absent;
         }
+        catch (Exception e)
+        {
+            // A gate threw inside Tsukimichi. The call runs in Umbra's startup and Tsukimichi's message, so it must not
+            // escape: log it and show the gate's absent answer.
+            Logger.Warning($"Tsukimichi for Umbra: a Tsukimichi gate failed: {e.GetType().Name}: {e.Message}");
+            return absent;
+        }
     }
 
     private static int? TryNullable(Func<int> call)
@@ -211,6 +218,11 @@ public sealed class TsukimichiLink : IDisposable
         }
         catch (IpcError)
         {
+            return null;
+        }
+        catch (Exception e)
+        {
+            Logger.Warning($"Tsukimichi for Umbra: a Tsukimichi gate failed: {e.GetType().Name}: {e.Message}");
             return null;
         }
     }
